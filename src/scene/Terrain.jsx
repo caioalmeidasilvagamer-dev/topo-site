@@ -57,7 +57,7 @@ function perlin3(x, y, z) {
  * Fractal Brownian Motion – sums several octaves of Perlin noise
  * to produce a natural-looking terrain heightmap.
  */
-function fbm(x, z, { octaves = 6, lacunarity = 2.0, gain = 0.5 } = {}) {
+function fbm(x, z, { octaves = 3, lacunarity = 2.0, gain = 0.45 } = {}) {
   let value = 0, amplitude = 0.5, frequency = 1.0
   for (let i = 0; i < octaves; i++) {
     value    += amplitude * perlin3(x * frequency, 0.5, z * frequency)
@@ -71,8 +71,8 @@ function fbm(x, z, { octaves = 6, lacunarity = 2.0, gain = 0.5 } = {}) {
 // Height function – exposed so CameraRig can also query it if needed
 // ---------------------------------------------------------------------------
 export function getHeight(x, z, {
-  scale       = 0.18,
-  heightScale = 4.5,
+  scale       = 0.055,
+  heightScale = 6,
   baseOffset  = -0.8,   // push the whole terrain slightly down
 } = {}) {
   return fbm(x * scale, z * scale) * heightScale + baseOffset
@@ -85,18 +85,18 @@ export function getHeight(x, z, {
  * Props:
  *  - segments      {number}  PlaneGeometry subdivisions (default 200)
  *  - size          {number}  World-space width/depth of the plane (default 30)
- *  - heightScale   {number}  Vertical exaggeration (default 4.5)
- *  - contourInterval {number} Height step between contour lines (default 0.5)
+ *  - heightScale   {number}  Vertical exaggeration (default 6)
+ *  - contourInterval {number} Height step between contour lines (default 0.4)
  *  - majorEvery    {number}  Every N contours = major line (default 5)
- *  - lineWidth     {number}  Minor line half-width in height units (default 0.06)
+ *  - lineWidth     {number}  Minor line half-width in height units (default 0.035)
  */
 export default function Terrain({
   segments        = 200,
   size            = 30,
-  heightScale     = 4.5,
-  contourInterval = 0.5,
+  heightScale     = 6,
+  contourInterval = 0.4,
   majorEvery      = 5,
-  lineWidth       = 0.06,
+  lineWidth       = 0.035,
 }) {
   const meshRef = useRef()
 
@@ -108,7 +108,7 @@ export default function Terrain({
     geo.rotateX(-Math.PI / 2)
 
     const pos = geo.attributes.position
-    const noiseScale  = 0.18
+    const noiseScale  = 0.055
     const baseOffset  = -0.8
 
     for (let i = 0; i < pos.count; i++) {

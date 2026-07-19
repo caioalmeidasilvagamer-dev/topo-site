@@ -44,13 +44,13 @@ export default function App() {
         <Terrain
           segments={200}
           size={30}
-          heightScale={4.5}
-          contourInterval={0.5}
+          heightScale={6}
+          contourInterval={0.4}
           majorEvery={5}
-          lineWidth={0.06}
+          lineWidth={0.035}
         />
 
-        {/* Dev helper – lets you orbit while we build; remove in production */}
+        {/* TEMP: remover antes da versão final */}
         <OrbitControls
           target={[0, -0.5, 0]}
           enableZoom
