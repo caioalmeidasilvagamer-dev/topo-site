@@ -41,23 +41,19 @@ export const TERRAIN_MID = (TERRAIN_TOP + TERRAIN_BASE) / 2   // ≈ -0.75
  * e a profundidade do relevo (câmera mais "de lado" do que "de cima").
  * X e Z iguais mantêm o eixo de simetria isométrico.
  */
-const ISO_POSITION = [16, 7, 16]    // Y=7 → ângulo ~23° de elevação
+const ISO_POSITION = [17, 8, 17]    // Melhor ângulo de visualização
 const LOOK_AT      = new THREE.Vector3(0, TERRAIN_MID, 0)
 
 /**
  * Zoom da câmera ortográfica.
- *
- * Valor 28 deixa ~12 % de espaço vazio ao redor do terreno (size=30)
- * em telas 16:9 típicas, dando respiro visual sem desperdiçar espaço.
- * Reduza mais se o terreno ainda tocar as bordas em viewports estreitos.
+ * Reduzido para 25 para que o terreno maior (size=75) preencha toda a tela.
  */
-const ORTHO_ZOOM = 28
+const ORTHO_ZOOM = 25
 
 /**
- * Posição inicial da câmera na intro (diretamente de cima, top-down).
- * Z ligeiramente diferente de zero para evitar gimbal lock ao olhar para o centro.
+ * Posição inicial da câmera na intro (ângulo quase vertical, evitando gimbal lock).
  */
-const START_POSITION = [0, 25, 0.001]
+const START_POSITION = [0.1, 25, 6]
 
 // ---------------------------------------------------------------------------
 // CameraRig
@@ -123,7 +119,7 @@ export default function CameraRig({
     camera.top    =  halfH
     camera.bottom = -halfH
     camera.near   = 0.1
-    camera.far    = 120
+    camera.far    = 70
     camera.zoom   = 1      // já usamos left/right/top/bottom diretamente
 
     // Apenas define a posição final no resize se a intro já tiver terminado

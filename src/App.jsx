@@ -1,82 +1,78 @@
 import { Canvas } from '@react-three/fiber'
 import { EffectComposer, DepthOfField } from '@react-three/postprocessing'
+import * as THREE from 'three'
 import Terrain from './scene/Terrain'
 import CameraRig from './scene/CameraRig'
 import LayerMarkers from './scene/LayerMarkers'
 import './index.css'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Parâmetros ajustáveis para o efeito Depth of Field (Tilt-Shift)
-// ─────────────────────────────────────────────────────────────────────────────
-const DOF_FOCUS_DISTANCE = 0.20   // Foco no centro do terreno (com base no far=120 da câmera)
-const DOF_FOCAL_LENGTH    = 0.12   // Plano de foco mais largo para manter marcadores nítidos
-const DOF_BOKEH_SCALE     = 1.8    // Desfoque máximo mais fraco e suave nas bordas
+import { useRef } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
 
-/**
- * App – canvas principal do topo-site.
- *
- * A câmera ortográfica isométrica é configurada inteiramente dentro do
- * CameraRig. O movimento futuro (scroll → GSAP ScrollTrigger) será
- * injetado via useSceneStore/useScrollSync, sem controles de mouse.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Componente de DOF Dinâmico: Mantém a montanha central sempre nítida
+// ─────────────────────────────────────────────────────────────────────────────
+function DynamicDOF() {
+  const { camera } = useThree()
+  const dofRef = useRef()
+
+  useFrame(() => {
+    if (!dofRef.current) return
+    // Foca na montanha central (0, -0.75, 0)
+    const target = new THREE.Vector3(0, -0.75, 0)
+    const dist = camera.position.distanceTo(target)
+    
+    // Normaliza a distância real para o intervalo [near, far] do buffer de depth
+    const near = camera.near || 0.1
+    const far = camera.far || 120
+    const normalized = (dist - near) / (far - near)
+    
+    dofRef.current.focusDistance = normalized
+  })
+
+  return (
+    <DepthOfField
+      ref={dofRef}
+      focalLength={0.14}  // Campo focal preciso ao redor do cume
+      bokehScale={4.5}    // Desfoque visível/estético nos relevos distantes
+      height={480}
+    />
+  )
+}
+
 export default function App() {
   return (
     <div id="canvas-root">
-      {/*
-        camera={false} → desabilita a câmera padrão do R3F para que
-        o <OrthographicCamera makeDefault> dentro do CameraRig tome conta.
-      */}
       <Canvas gl={{ antialias: true }} shadows camera={false}>
-        {/* Cor de fundo da cena – warm off-white papel topográfico */}
-        <color attach="background" args={['#f0ede8']} />
+        {/* Fundo escuro — estética mapa topográfico noturno */}
+        <color attach="background" args={['#0f0f0e']} />
 
-        {/* Luz ambiente – base paper-white não vai a preto */}
-        <ambientLight intensity={0.85} />
-
-        {/* Luz direcional suave para leitura da topografia */}
+        <ambientLight intensity={0.25} />
         <directionalLight
           position={[8, 16, 6]}
-          intensity={0.6}
+          intensity={0.45}
           castShadow
           shadow-mapSize={[2048, 2048]}
         />
 
-        {/* Câmera ortográfica isométrica – fixa, sem controles de usuário */}
         <CameraRig />
 
-        {/* Terreno topográfico com shader de curvas de nível */}
         <Terrain
-          segments={200}
-          size={30}
-          heightScale={6}
-          contourInterval={0.4}
+          segments={280}
+          size={75}
+          contourInterval={0.45}
           majorEvery={5}
-          lineWidth={0.035}
+          lineWidth={0.032}
         />
 
-        {/*
-          Efeitos de Post-processing.
-          O DepthOfField cria o efeito tilt-shift desejado na malha 3D do terreno.
-        */}
+        {/* DOF: foco dinâmico na montanha central, desfoque crescente nas bordas */}
         <EffectComposer>
-          <DepthOfField
-            focusDistance={DOF_FOCUS_DISTANCE}
-            focalLength={DOF_FOCAL_LENGTH}
-            bokehScale={DOF_BOKEH_SCALE}
-            height={480} // Resolução interna de cálculo do buffer de depth/blur
-          />
+          <DynamicDOF />
         </EffectComposer>
 
-        {/*
-          Marcadores de seção: setas + círculos Html por camada de altura.
-          Nota: Como o R3F <Html> é renderizado fora do canvas WebGL (como elementos
-          DOM reais sobrepostos), ele não é afetado pelo EffectComposer/DepthOfField.
-          Isso garante que os avatares e textos dos marcadores permaneçam 100% nítidos
-          e legíveis.
-        */}
+        {/* Marcadores de seção com ângulo aberto + animação de desenho */}
         <LayerMarkers />
       </Canvas>
     </div>
   )
 }
-

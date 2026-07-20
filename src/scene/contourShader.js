@@ -126,9 +126,9 @@ export function createContourMaterial({
       uLineWidth:        { value: lineWidth },
       uMajorWidthMult:   { value: majorWidthMult },
       uHeightScale:      { value: 1.0 },
-      uTerrainColor:     { value: new THREE.Color(0xfafafa) },  // off-white paper
-      uContourColor:     { value: new THREE.Color(0x111111) },  // near-black minor
-      uMajorColor:       { value: new THREE.Color(0x000000) },  // pure black major
+      uTerrainColor:     { value: new THREE.Color(0x141412) },  // near-black terrain
+      uContourColor:     { value: new THREE.Color(0xd8d3cb) },  // warm cream minor lines
+      uMajorColor:       { value: new THREE.Color(0xf0ede8) },  // brighter white major lines
     },
     side: THREE.FrontSide,
   })

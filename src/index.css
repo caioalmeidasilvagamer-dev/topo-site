@@ -47,3 +47,24 @@ html, body {
   width: 100% !important;
   height: 100% !important;
 }
+
+/* Glow ring keyframe pulse animation — apenas scale + opacity, sem translate
+   (o posicionamento absoluto é feito via top/left/marginTop no componente) */
+@keyframes pulse-glow {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.5;
+  }
+}
+
+.pulse-glow-ring {
+  animation: pulse-glow 2.8s ease-in-out infinite;
+}
