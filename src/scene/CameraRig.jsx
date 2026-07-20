@@ -1,7 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { OrthographicCamera } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import gsap from 'gsap'
+import { useSceneStore } from '../state/useSceneStore'
 
 // ---------------------------------------------------------------------------
 // Constantes de altura do terreno (baseadas nos parâmetros do Terrain.jsx)
@@ -35,23 +37,27 @@ export const TERRAIN_MID = (TERRAIN_TOP + TERRAIN_BASE) / 2   // ≈ -0.75
 // ---------------------------------------------------------------------------
 
 /**
- * Direção de visão isométrica 3/4 normalizada (ângulo clássico 45°/35.26°).
- * A câmera fica "acima e à frente" do terreno, olhando para o centro.
+ * Posição isométrica 3/4 com Y reduzido para mostrar melhor a elevação
+ * e a profundidade do relevo (câmera mais "de lado" do que "de cima").
+ * X e Z iguais mantêm o eixo de simetria isométrico.
  */
-const ISO_POSITION = [14, 12, 14]   // [X, Y, Z] – vetor isométrico igual
+const ISO_POSITION = [16, 7, 16]    // Y=7 → ângulo ~23° de elevação
 const LOOK_AT      = new THREE.Vector3(0, TERRAIN_MID, 0)
 
 /**
  * Zoom da câmera ortográfica.
  *
- * Para um PlaneGeometry de size=30 visto em ângulo isométrico, o "raio"
- * visível no plano é ~30√2/2 ≈ 21.2 unidades.  O zoom mapeia esse raio
- * para metade da menor dimensão do viewport.  Um valor de zoom=35 deixa
- * o terreno inteiro visível com ~10 % de margem em telas 16:9 típicas.
- *
- * Ajuste este valor se o terreno aparecer cortado ou muito pequeno.
+ * Valor 28 deixa ~12 % de espaço vazio ao redor do terreno (size=30)
+ * em telas 16:9 típicas, dando respiro visual sem desperdiçar espaço.
+ * Reduza mais se o terreno ainda tocar as bordas em viewports estreitos.
  */
-const ORTHO_ZOOM = 35
+const ORTHO_ZOOM = 28
+
+/**
+ * Posição inicial da câmera na intro (diretamente de cima, top-down).
+ * Z ligeiramente diferente de zero para evitar gimbal lock ao olhar para o centro.
+ */
+const START_POSITION = [0, 25, 0.001]
 
 // ---------------------------------------------------------------------------
 // CameraRig
@@ -73,6 +79,36 @@ export default function CameraRig({
   zoom     = ORTHO_ZOOM,
 }) {
   const { camera, size } = useThree()
+  const setIntroComplete = useSceneStore((state) => state.setIntroComplete)
+  const introComplete = useSceneStore((state) => state.introComplete)
+  const cameraRef = useRef()
+
+  // Animação de intro (só roda uma vez ao montar o componente)
+  useEffect(() => {
+    const cam = cameraRef.current
+    if (!cam) return
+
+    // Posiciona no top-down inicial
+    cam.position.set(...START_POSITION)
+    cam.lookAt(target instanceof THREE.Vector3 ? target : new THREE.Vector3(...target))
+    cam.updateProjectionMatrix()
+
+    // Anima até a posição isométrica final
+    gsap.to(cam.position, {
+      x: position[0],
+      y: position[1],
+      z: position[2],
+      duration: 2.5,
+      ease: 'power2.inOut',
+      onUpdate: () => {
+        cam.lookAt(target instanceof THREE.Vector3 ? target : new THREE.Vector3(...target))
+        cam.updateProjectionMatrix()
+      },
+      onComplete: () => {
+        setIntroComplete(true)
+      },
+    })
+  }, [position, target, setIntroComplete])
 
   // Recalcula o frustum sempre que o viewport muda de tamanho
   useEffect(() => {
@@ -87,28 +123,32 @@ export default function CameraRig({
     camera.top    =  halfH
     camera.bottom = -halfH
     camera.near   = 0.1
-    camera.far    = 400
+    camera.far    = 120
     camera.zoom   = 1      // já usamos left/right/top/bottom diretamente
 
-    camera.position.set(...position)
-    camera.lookAt(target instanceof THREE.Vector3 ? target : new THREE.Vector3(...target))
+    // Apenas define a posição final no resize se a intro já tiver terminado
+    if (introComplete) {
+      camera.position.set(...position)
+      camera.lookAt(target instanceof THREE.Vector3 ? target : new THREE.Vector3(...target))
+    }
     camera.updateProjectionMatrix()
-  }, [camera, size, position, target, zoom])
+
+    // TODO: remover antes da versão final
+    console.log(
+      '[CameraRig] posição:', camera.position.toArray().map(v => +v.toFixed(2)),
+      '| zoom (frustum half-height):', +(size.height / 2 / zoom).toFixed(2),
+      '| ORTHO_ZOOM const:', zoom
+    )
+  }, [camera, size, position, target, zoom, introComplete])
 
   return (
     <OrthographicCamera
+      ref={cameraRef}
       makeDefault
-      position={position}
+      position={START_POSITION}
       zoom={zoom}
       near={0.1}
-      far={400}
-      onUpdate={(cam) => {
-        // lookAt não é uma prop nativa do OrthographicCamera do drei,
-        // então aplicamos manualmente após o primeiro mount.
-        const t = target instanceof THREE.Vector3 ? target : new THREE.Vector3(...target)
-        cam.lookAt(t)
-        cam.updateProjectionMatrix()
-      }}
+      far={120}
     />
   )
 }

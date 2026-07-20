@@ -67,15 +67,56 @@ function fbm(x, z, { octaves = 3, lacunarity = 2.0, gain = 0.45 } = {}) {
   return value
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Constantes de topologia do relevo (expostas para fácil ajuste)
+// ─────────────────────────────────────────────────────────────────────────────
+export const centerPeakHeight = 7.0    // Altura máxima do pico central
+export const centerRadius     = 9.0    // Raio de influência da montanha central (em relação ao tamanho 30)
+export const noiseAmplitude   = 3.8    // Amplitude do ruído fbm secundário (aumentado em 1.8x para mais irregularidade)
+
 // ---------------------------------------------------------------------------
-// Height function – exposed so CameraRig can also query it if needed
+// Height function – exposed so CameraRig and LayerMarkers can query it
 // ---------------------------------------------------------------------------
-export function getHeight(x, z, {
-  scale       = 0.055,
-  heightScale = 6,
-  baseOffset  = -0.8,   // push the whole terrain slightly down
-} = {}) {
-  return fbm(x * scale, z * scale) * heightScale + baseOffset
+export function getHeight(x, z) {
+  const scale = 0.055
+  const baseOffset = -0.8
+  const warpStrength = 2.5   // Força de distorção das coordenadas radialmente
+
+  // 1. Domain warping: distorce as coordenadas (x, z) usando o próprio fbm em baixa frequência
+  const warpedX = x + fbm(x * 0.05, z * 0.05) * warpStrength
+  const warpedZ = z + fbm(x * 0.05 + 100.0, z * 0.05 + 100.0) * warpStrength
+
+  // Distância do ponto distorcido até o centro (0,0)
+  const dist = Math.sqrt(warpedX * warpedX + warpedZ * warpedZ)
+  
+  // Proporção de distância em relação ao raio do domo
+  const ratio = Math.min(1.0, dist / centerRadius)
+  
+  // Curva de falloff parabólica suave (arredondada no topo)
+  const falloff = (1.0 - ratio) * (1.0 - ratio)
+  
+  // 2. Dome radial com ruído na própria altura para quebrar anéis concêntricos perfeitos
+  const radialHeight = centerPeakHeight * falloff * (1.0 + fbm(x * 0.15, z * 0.15) * 0.15)
+
+  // 3. Ruído fbm secundário (colinas e vales)
+  const fbmNoise = fbm(x * scale, z * scale)
+
+  return radialHeight + fbmNoise * noiseAmplitude + baseOffset
+}
+
+/**
+ * Retorna um ponto {x, y, z} na encosta da montanha central correspondente
+ * a fractionFromTop (0 = pico/centro, 1 = base/limite do domo) sob determinado ângulo.
+ *
+ * @param {number} fractionFromTop - 0 (pico) a 1 (base do domo)
+ * @param {number} angle - ângulo em radianos para espalhar os marcadores
+ */
+export function getCentralMountainPoint(fractionFromTop, angle = 0) {
+  const distance = fractionFromTop * centerRadius
+  const x = Math.cos(angle) * distance
+  const z = Math.sin(angle) * distance
+  const y = getHeight(x, z)
+  return { x, y, z }
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +126,6 @@ export function getHeight(x, z, {
  * Props:
  *  - segments      {number}  PlaneGeometry subdivisions (default 200)
  *  - size          {number}  World-space width/depth of the plane (default 30)
- *  - heightScale   {number}  Vertical exaggeration (default 6)
  *  - contourInterval {number} Height step between contour lines (default 0.4)
  *  - majorEvery    {number}  Every N contours = major line (default 5)
  *  - lineWidth     {number}  Minor line half-width in height units (default 0.035)
@@ -93,7 +133,6 @@ export function getHeight(x, z, {
 export default function Terrain({
   segments        = 200,
   size            = 30,
-  heightScale     = 6,
   contourInterval = 0.4,
   majorEvery      = 5,
   lineWidth       = 0.035,
@@ -108,20 +147,18 @@ export default function Terrain({
     geo.rotateX(-Math.PI / 2)
 
     const pos = geo.attributes.position
-    const noiseScale  = 0.055
-    const baseOffset  = -0.8
 
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i)
       const z = pos.getZ(i)
-      const h = fbm(x * noiseScale, z * noiseScale) * heightScale + baseOffset
+      const h = getHeight(x, z)
       pos.setY(i, h)
     }
 
     pos.needsUpdate = true
     geo.computeVertexNormals()   // important for the shading term in the shader
     return geo
-  }, [segments, size, heightScale])
+  }, [segments, size])
 
   // ---- Shader material (once) ----------------------------------------------
   const material = useMemo(() => createContourMaterial({
